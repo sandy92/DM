@@ -1,8 +1,7 @@
 library(ggplot2)
 #install.packages("StatMatch")
 #install.packages("vegan")
-library(vegan) # used for jaccard
-library(StatMatch)
+library(StatMatch) # used for gower.dist
 library(plyr) # used for rename
 library(arules) # used for apriori
 library(cluster) # used for k mediods
@@ -50,8 +49,8 @@ plot(1:15, wss, type="b", xlab="Number of Clusters",
 
 
 # binary data
-
-j <- i[1:1000,1:5]
+im <- read.csv("imdb2.csv")
+j <- im[1:1000,1:5]
 rownames(j) <-  j[,1]
 j <- j[,-1]
 k <- cbind(as.vector(j$cast.1),as.vector(j$cast.2),as.vector(j$cast.3),as.vector(j$cast.4))
@@ -76,9 +75,7 @@ l2 <- sapply(l1,as.logical)
 l3 <- merge(rownames(l),l2,by="row.names")
 l3 <- l3[,2:(ncol(l3)-1)]
 
-
-
-l4 <- l3[1:5,]
+l4 <- sapply(l3,as.numeric)
 l5 <- l3[,2:ncol(l3)]
 
 l3.better <- apriori(l5,
@@ -102,7 +99,44 @@ getUniqueSortedRules <- function(rules) {
   rules[!index]
 }
 
-
 # clustering
+#tkm2 <- pam(gower.dist(l6[,2:ncol(l6)]),k = 2,diss = T)
 # pam(dist(l7,"binary",upper=T,diag=T),2,diss = T)
 
+genres <- im[,c("genres.1","genres.2","genres.3","genres.4")]
+genres <- replace(genres, genres == "null", NA)
+uniqueGenres <- unique(as.vector(cbind(as.vector(genres$genres.1),as.vector(genres$genres.2),as.vector(genres$genres.3),as.vector(genres$genres.4))))
+uniqueGenres <- uniqueGenres[!is.na(uniqueGenres)]
+
+
+kmd <- pam(gower.dist(l4[,2:ncol(l4)]),k = length(uniqueGenres),diss = T)
+
+purity <- function(km,data,genres) {
+  final <- matrix(0,length(km$medoids),length(genres))
+  colnames(final) <- genres
+  
+  j <- 0
+  for(i in km$clustering) {
+    j <- j+1
+    #print(paste(i,j,"---"))
+    if(data[j,"genres.1"] != "null"){
+      final[i,data[j,"genres.1"]] = final[i,data[j,"genres.1"]] + 1
+    }
+    if(data[j,"genres.2"] != "null"){
+      final[i,data[j,"genres.2"]] = final[i,data[j,"genres.2"]] + 1
+    }
+    if(data[j,"genres.3"] != "null"){
+      final[i,data[j,"genres.3"]] = final[i,data[j,"genres.3"]] + 1
+    }
+    if(data[j,"genres.4"] != "null"){
+      final[i,data[j,"genres.4"]] = final[i,data[j,"genres.4"]] + 1
+    }
+  }
+  m <- 0
+  for(i in 1:nrow(final)) {
+    m <- m + max(final[i,])
+  }
+  m/sum(final)
+}
+
+purity(tkm2,im,uniqueGenres)
